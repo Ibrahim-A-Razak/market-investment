@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Simulator</title>
+    <style>
+        /* CSS STYLES */
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --bg: #f3f4f6;
+            --card: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .balance-card {
+            background: var(--primary);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .balance-card h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .balance-card h1 {
+            margin: 10px 0 0;
+            font-size: 2.5rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        h3 {
+            margin-top: 0;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        td {
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .positive {
+            color: var(--success);
+        }
+
+        .negative {
+            color: var(--danger);
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button.sell {
+            background-color: var(--danger);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 300px;
+            text-align: center;
+        }
+
+        input {
+            width: 80%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .btn-cancel {
+            background: #999;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>📈 MarketInvest</h1>
+            <button onclick="resetData()" style="background:#666; font-size:0.8rem;">Reset Data</button>
+        </header>
+
+        <!-- Balance Display -->
+        <div class="balance-card">
+            <h2>Total Cash Balance</h2>
+            <h1 id="displayBalance">$10,000.00</h1>
+        </div>
+
+        <div class="grid">
+            <!-- Market Section -->
+            <div class="card">
+                <h3>Market Watch</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Price</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockList">
+                        <!-- Stocks injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Portfolio Section -->
+            <div class="card">
+                <h3>Your Portfolio</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Qty</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="portfolioList">
+                        <!-- Holdings injected by JS -->
+                    </tbody>
+                </table>
+                <div id="emptyPortfolio" style="text-align:center; color:#999; padding:20px;">
+                    No stocks owned yet.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buy Modal -->
+    <div id="tradeModal" class="modal">
+        <div class="modal-content">
+            <h3 id="modalStockName">Buy Stock</h3>
+            <p>Price: $<span id="modalPrice">0.00</span></p>
+            <input type="number" id="buyQty" min="1" value="1" placeholder="Quantity">
+            <p>Total: $<span id="modalTotal">0.00</span></p>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+                <button onclick="confirmBuy()">Confirm Buy</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* JAVASCRIPT LOGIC */
+
+        // 1. Initial Data (Mock Market)
+        const defaultStocks = [
+            { symbol: 'AAPL', name: 'Apple', price: 150.00 },
+            { symbol: 'TSLA', name: 'Tesla', price: 220.50 },
+            { symbol: 'GOOG', name: 'Google', price: 2800.00 },
+            { symbol: 'AMZN', name: 'Amazon', price: 3300.00 },
+            { symbol: 'MSFT', name: 'Microsoft', price: 310.00 }
+        ];
+
+        // 2. State Management
+        let userData = {
+            balance: 10000,
+            holdings: [] // { symbol, qty, avgPrice }
+        };
+
+        let selectedStock = null;
+
+        // 3. Load Data from LocalStorage (Persistence)
+        function loadData() {
+            const saved = localStorage.getItem('investJS_data');
+            if (saved) {
+                userData = JSON.parse(saved);
+            }
+            updateUI();
+        }
+
+        // 4. Save Data to LocalStorage
+        function saveData() {
+            localStorage.setItem('investJS_data', JSON.stringify(userData));
+            updateUI();
+        }
+
+        // 5. Render UI
+        function updateUI() {
+            // Update Balance
+            document.getElementById('displayBalance').innerText = `$${userData.balance.toFixed(2)}`;
+
+            // Render Market List
+            const stockList = document.getElementById('stockList');
+            stockList.innerHTML = '';
+            defaultStocks.forEach(stock => {
+                // Simulate small price fluctuation
+                const fluctuation = (Math.random() - 0.5) * 2;
+                const currentPrice = parseFloat((stock.price + fluctuation).toFixed(2));
+
+                const row = `
+                <tr>
+                    <td><strong>${stock.symbol}</strong><br><small>${stock.name}</small></td>
+                    <td>$${currentPrice.toFixed(2)}</td>
+                    <td><button onclick="openModal('${stock.symbol}', ${currentPrice})">Buy</button></td>
+                </tr>
+            `;
+                stockList.innerHTML += row;
+            });
+
+            // Render Portfolio
+            const portList = document.getElementById('portfolioList');
+            const emptyMsg = document.getElementById('emptyPortfolio');
+            portList.innerHTML = '';
+
+            if (userData.holdings.length === 0) {
+                emptyMsg.style.display = 'block';
+            } else {
+                emptyMsg.style.display = 'none';
+                userData.holdings.forEach(h => {
+                    // Find current price from mock data
+                    const stock = defaultStocks.find(s => s.symbol === h.symbol);
+                    const currentPrice = stock ? stock.price : 0;
+                    const totalValue = currentPrice * h.qty;
+
+                    const row = `
+                    <tr>
+                        <td>${h.symbol}</td>
+                        <td>${h.qty}</td>
+                        <td>$${totalValue.toFixed(2)}</td>
+                    </tr>
+                `;
+                    portList.innerHTML += row;
+                });
+            }
+        }
+
+        // 6. Modal Functions
+        function openModal(symbol, price) {
+            selectedStock = { symbol, price };
+            document.getElementById('modalStockName').innerText = `Buy ${symbol}`;
+            document.getElementById('modalPrice').innerText = price.toFixed(2);
+            document.getElementById('tradeModal').style.display = 'flex';
+            calculateTotal();
+        }
+
+        function closeModal() {
+            document.getElementById('tradeModal').style.display = 'none';
+            selectedStock = null;
+        }
+
+        document.getElementById('buyQty').addEventListener('input', calculateTotal);
+
+        function calculateTotal() {
+            const qty = document.getElementById('buyQty').value;
+            const total = qty * selectedStock.price;
+            document.getElementById('modalTotal').innerText = total.toFixed(2);
+        }
+
+        // 7. Buy Logic
+        function confirmBuy() {
+            const qty = parseInt(document.getElementById('buyQty').value);
+            const totalCost = qty * selectedStock.price;
+
+            if (userData.balance < totalCost) {
+                alert("Insufficient Funds!");
+                return;
+            }
+
+            // Deduct Balance
+            userData.balance -= totalCost;
+
+            // Update Holdings
+            const existing = userData.holdings.find(h => h.symbol === selectedStock.symbol);
+            if (existing) {
+                existing.qty += qty;
+            } else {
+                userData.holdings.push({
+                    symbol: selectedStock.symbol,
+                    qty: qty,
+                    avgPrice: selectedStock.price
+                });
+            }
+
+            saveData();
+            closeModal();
+            alert(`Successfully bought ${qty} shares of ${selectedStock.symbol}!`);
+        }
+
+        // 8. Reset Data
+        function resetData() {
+            if (confirm("Reset all progress?")) {
+                localStorage.removeItem('investJS_data');
+                location.reload();
+            }
+        }
+
+        // Initialize
+        loadData();
+
+        // Simulate Live Prices (Update every 3 seconds)
+        setInterval(updateUI, 3000);
+
+    </script>
+
+</body>
+
+</html>
